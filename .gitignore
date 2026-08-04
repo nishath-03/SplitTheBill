@@ -1,0 +1,36 @@
+# ─── Dependencies ─────────────────────────────────────────────
+node_modules/
+.npm
+
+# ─── Build outputs ────────────────────────────────────────────
+frontend/dist/
+backend/target/
+
+# ─── Environment & Secrets ────────────────────────────────────
+.env
+.env.local
+.env.*.local
+deploy/.env
+deploy/.env.production
+
+# ─── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── IDE ──────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.suo
+*.user
+
+# ─── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Maven wrapper ────────────────────────────────────────────
+!.mvn/wrapper/maven-wrapper.jar
+
+# ─── AWS / SSH Keys ───────────────────────────────────────────
+*.pem
+*.key

@@ -29,13 +29,12 @@ export function parseReceiptText(rawText) {
     .map(l => l.trim())
     .filter(l => l.length >= 3);
 
-  // Lines to skip (totals, taxes, headers, metadata)
+  // Lines to skip (totals, headers, metadata)
   const SKIP_PATTERNS = [
     /^\s*total[:\s]*[\d₹]/i,            // "Total: 1139" or "Total ₹1139"
     /^\s*total\s*$/i,                    // just the word "Total"
     /\b(sub[\s\-]?total|grand total|net total|total amount|amount due|amount payable)\b/i,
-    /\b(cgst|sgst|igst|vat|service tax|service charge|cess)\b/i,
-    /\b(discount|round[\s\-]?off|cash|card|upi|online|paid|change|balance)\b/i,
+    /\b(cash|card|upi|online|paid|change|balance)\b/i,
     /\b(invoice|receipt|order|bill no|table|date|time|phone|mob|address|pin|gst no|gstin|fssai)\b/i,
     /\b(thank you|welcome|visit|please|customer copy|duplicate)\b/i,
     /\b(qty|quantity|item|price|rate|total)\b.*\b(qty|quantity|item|price|rate|total)\b/i, // header row

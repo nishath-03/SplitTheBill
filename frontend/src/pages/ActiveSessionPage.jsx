@@ -60,54 +60,72 @@ export default function ActiveSessionPage() {
     }
   };
 
-  const handleScanBill = async () => {
+  const handleScanWithAI = async () => {
+    if (!billImage) return;
+    if (!geminiApiKey.trim()) {
+      toast.warn('Please enter a Gemini API key above to use AI scanning.', { autoClose: 4000 });
+      return;
+    }
+    setScanningBill(true);
+    setOcrProgress(50);
+
+    try {
+      localStorage.setItem('splitbill_gemini_key', geminiApiKey.trim());
+      const base64Data = billImage.split(',')[1];
+      
+      const res = await api.post(`/sessions/${roomCode}/items/scan-bill`, {
+        image: base64Data,
+        mimeType: imageMimeType,
+        geminiApiKey: geminiApiKey.trim()
+      }, { timeout: 60000 });
+
+      const parsed = res.data.map(item => ({
+        id: `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        itemName: String(item.itemName || '').trim(),
+        amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0
+      })).filter(it => it.itemName && it.amount > 0);
+
+      setOcrProgress(100);
+
+      if (parsed.length === 0) {
+        toast.warn('No items detected by AI. Try a clearer photo.');
+      } else {
+        toast.info(`🤖 AI found ${parsed.length} items`, { autoClose: 2000 });
+        setExtractedItems(parsed);
+        setShowReview(true);
+      }
+    } catch (aiErr) {
+      const errMsg = aiErr.response?.data?.message || aiErr.message || 'Unknown API Error';
+      toast.error(`AI Vision failed: ${errMsg}`, { autoClose: 6000 });
+      console.error("Gemini API Error:", aiErr);
+    } finally {
+      setScanningBill(false);
+      setTimeout(() => setOcrProgress(0), 1000);
+    }
+  };
+
+  const handleScanWithOCR = async () => {
     if (!billImage) return;
     setScanningBill(true);
     setOcrProgress(0);
 
     try {
-      // ── Step 1: Tesseract OCR (always runs, free, offline) ──────────────
       const rawText = await runOCR(billImage, setOcrProgress);
-
-      let parsed = [];
-
-      if (geminiApiKey.trim()) {
-        // ── Step 2a: Send OCR text → Gemini for intelligent parsing ────────
-        // Text API uses ~10x less quota than image API; auto-corrects OCR typos
-        try {
-          localStorage.setItem('splitbill_gemini_key', geminiApiKey.trim());
-          const res = await api.post(`/sessions/${roomCode}/items/parse-text`, {
-            text: rawText,
-            geminiApiKey: geminiApiKey.trim()
-          });
-          parsed = res.data.map(item => ({
-            id: `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            itemName: String(item.itemName || '').trim(),
-            amount: typeof item.amount === 'number' ? item.amount : parseFloat(item.amount) || 0
-          })).filter(it => it.itemName && it.amount > 0);
-          toast.info(`🤖 AI found ${parsed.length} items`, { autoClose: 2000 });
-        } catch (_aiErr) {
-          // ── Step 2b: Gemini failed → silently fall back to regex ───────
-          toast.warn('AI unavailable — using local OCR parser as fallback', { autoClose: 3000 });
-          parsed = parseReceiptText(rawText);
-        }
-      } else {
-        // ── Step 2b: No key → regex parser ─────────────────────────────
-        parsed = parseReceiptText(rawText);
-      }
+      const parsed = parseReceiptText(rawText);
 
       if (parsed.length === 0) {
-        toast.warn('No items detected. Try a clearer, well-lit photo.');
+        toast.warn('No items detected by OCR. Try a clearer, well-lit photo.');
       } else {
+        toast.info(`📄 OCR found ${parsed.length} items`, { autoClose: 2000 });
         setExtractedItems(parsed);
         setShowReview(true);
       }
     } catch (err) {
-      toast.error('OCR failed. Please try a clearer photo.');
-      console.error(err);
+      toast.error('Local OCR failed. Please try again.');
+      console.error("OCR Error:", err);
     } finally {
       setScanningBill(false);
-      setOcrProgress(0);
+      setTimeout(() => setOcrProgress(0), 1000);
     }
   };
 
@@ -868,23 +886,29 @@ export default function ActiveSessionPage() {
               {!showReview && (
                 <div className="d-flex flex-column gap-2 mt-2">
                   {billImage ? (
-                    <button
-                      className="btn-hs-primary w-100 py-3 d-flex align-items-center justify-content-center gap-2"
-                      onClick={handleScanBill}
-                      disabled={scanningBill}
-                      style={{ fontSize: '1.05rem', fontWeight: 700 }}
-                    >
-                      {scanningBill ? (
-                        <>
-                          <div className="hs-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px', borderTopColor: '#fff' }} />
-                          {`Reading receipt… ${ocrProgress}%`}
-                        </>
-                      ) : (
-                        geminiApiKey.trim()
-                          ? '🤖 Scan (OCR + AI)'
-                          : '🔍 Scan (Free OCR)'
-                      )}
-                    </button>
+                    <>
+                      <button
+                        className="btn-hs-primary w-100 py-3 d-flex align-items-center justify-content-center gap-2"
+                        onClick={handleScanWithAI}
+                        disabled={scanningBill}
+                        style={{ fontSize: '1.05rem', fontWeight: 700 }}
+                      >
+                        {scanningBill ? (
+                          <>
+                            <div className="hs-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px', borderTopColor: '#fff' }} />
+                            {`Processing with AI… ${ocrProgress}%`}
+                          </>
+                        ) : '🤖 Scan with AI'}
+                      </button>
+                      <button
+                        className="btn-hs-outline w-100 py-2.5 d-flex align-items-center justify-content-center gap-2"
+                        onClick={handleScanWithOCR}
+                        disabled={scanningBill}
+                        style={{ fontSize: '0.95rem', fontWeight: 600 }}
+                      >
+                        📄 Scan with Local OCR
+                      </button>
+                    </>
                   ) : (
                     <button
                       className="btn-hs-primary w-100 py-3"

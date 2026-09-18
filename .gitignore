@@ -5,11 +5,15 @@ node_modules/
 # ─── Build outputs ────────────────────────────────────────────
 frontend/dist/
 backend/target/
+dist/
+target/
 
 # ─── Environment & Secrets ────────────────────────────────────
 .env
 .env.local
 .env.*.local
+frontend/.env
+frontend/.env.local
 deploy/.env
 deploy/.env.production
 
@@ -34,3 +38,20 @@ Thumbs.db
 # ─── AWS / SSH Keys ───────────────────────────────────────────
 *.pem
 *.key
+
+# ─── Stale root-level files (real sources live in frontend/ and backend/) ───
+/src/
+/public/
+/index.html
+/vite.config.js
+/eslint.config.js
+/package.json
+/package-lock.json
+/pom.xml
+/run.bat
+/deploy.sh
+/setup-server.sh
+
+# ─── Word docs & other non-source files ───────────────────────
+*.docx
+*.doc

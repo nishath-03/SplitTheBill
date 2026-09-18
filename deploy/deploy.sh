@@ -9,7 +9,7 @@ set -e
 
 # ─── CONFIG — Edit these values ──────────────────────────────
 EC2_USER="ubuntu"
-EC2_HOST="13.210.115.187"
+EC2_HOST="3.14.80.100"
 EC2_KEY="/c/Users/Nishath A/Downloads/splitthebill-key.pem"
 # ──────────────────────────────────────────────────────────────
 

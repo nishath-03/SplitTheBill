@@ -1,431 +1,194 @@
-﻿# 🍽️ SplitTheBill — Real-Time Hotel Bill Splitting Platform
+# 🍽️ SplitTheBill
 
-> **Live Demo** → [https://nishath-splitthebill.duckdns.org](https://nishath-splitthebill.duckdns.org)
+A real-time bill-splitting web app for groups — scan receipts, assign items, and settle up instantly.
 
-SplitTheBill is a full-stack, real-time bill splitting application built for groups dining out together. A host creates a session and shares a QR code — guests join instantly from their phones, items are added live, and everyone sees exactly what they owe. Pay via UPI or Razorpay and the host confirms payment right there at the table.
-
----
-
-## 🌟 Key Features
-
-- 📷 **AI-Powered Bill Scanning**: Upload a photo of your hotel bill — Gemini AI + Tesseract OCR extracts all line items automatically.
-- 🔗 **QR Code Join Flow**: Guests scan a QR code to join the session instantly — no app install required.
-- ⚡ **Real-Time WebSocket Sync**: Live updates of bill items, member statuses, and payment confirmations pushed to all connected devices.
-- 💳 **Multiple Split Modes**: Split `EQUAL`, `ITEMWISE` (per-person item assignment), or `PERCENTAGE`.
-- 💸 **Integrated Payments**: Pay via UPI deep-link (any UPI app) or Razorpay payment gateway — host confirms receipt in-app.
-- 🎰 **Spinner — Who Pays Extra?**: A fun random spinner wheel to decide who covers taxes, tips, or extra charges.
-- 📄 **PDF Bill Export**: Auto-generate an itemized bill PDF, upload to AWS S3, and share a link with the group.
-- 🔐 **JWT Authentication**: Stateless, secure host authentication with access & refresh token support.
-- 📊 **Session Dashboard**: Hosts see a full summary — members, amounts owed, and payment status at a glance.
+**Stack:** React (Vite) · Spring Boot 3 (Java 21) · MySQL · Redis · WebSocket (STOMP) · Nginx · AWS EC2
 
 ---
 
-## 🛠️ Tech Stack
+## 📁 Project Structure
 
-### **Frontend**
-| Technology | Purpose |
-| :--- | :--- |
-| **React 19** (Vite) | SPA framework & build tool |
-| **React Router DOM v7** | Client-side routing |
-| **Axios** | HTTP client with JWT interceptors |
-| **WebSocket (STOMP)** | Real-time session push events |
-| **QRCode.react** | QR code generation for room sharing |
-| **jsQR + Tesseract.js** | In-browser QR scanning & OCR for bill photos |
-| **React Toastify** | Notification toasts |
-| **Bootstrap 5** | UI component styling |
-
-### **Backend**
-| Technology | Purpose |
-| :--- | :--- |
-| **Java 21 (LTS)** | Language & runtime |
-| **Spring Boot 3.4.0** | Application framework |
-| **Spring Security + JJWT** | JWT-based authentication & authorization |
-| **Spring Data JPA + Hibernate** | ORM & database access layer |
-| **Spring WebSocket (STOMP)** | Real-time push events to clients |
-| **Spring Data Redis** | Session caching & refresh token storage |
-| **MySQL 8** | Relational database |
-| **iText 7 (PDF)** | Itemized bill PDF generation |
-| **AWS SDK S3** | PDF upload & cloud storage |
-| **Google ZXing** | QR code image generation |
-| **Google Gemini AI** | AI-powered bill item extraction from images |
-| **Apache Maven** | Build & dependency management |
-
-### **Infrastructure**
-| Component | Technology |
-| :--- | :--- |
-| **Cloud** | AWS EC2 (Ubuntu) |
-| **Database** | AWS RDS (MySQL 8) |
-| **File Storage** | AWS S3 |
-| **Cache** | Redis |
-| **Reverse Proxy** | Nginx |
-| **Process Manager** | systemd |
-
----
-
-## 🏗️ System Architecture
-
-```mermaid
-flowchart TD
-    subgraph Client ["Client Layer (Browser / Mobile)"]
-        UI["React 19 SPA (Vite)"]
-        WS_Client["WebSocket Client (STOMP)"]
-        QR["QR Code Scanner / Generator"]
-        OCR["Tesseract.js OCR"]
-    end
-
-    subgraph Gateway ["Reverse Proxy"]
-        Nginx["Nginx\n(Static Files + API Proxy)"]
-    end
-
-    subgraph Security ["Security Layer"]
-        JwtFilter["JWT Auth Filter"]
-        SecConfig["Spring Security Config"]
-    end
-
-    subgraph Backend ["Backend API (Spring Boot 3.4)"]
-        AuthCtrl["Auth Controller"]
-        SessionCtrl["Session Controller"]
-        BillCtrl["Bill Controller"]
-        MemberCtrl["Member Controller"]
-        SpinCtrl["Spinner Controller"]
-        WSBroker["WebSocket Broker (STOMP)"]
-    end
-
-    subgraph Services ["Service & Integration Layer"]
-        GeminiAI["Gemini AI\n(Bill Parsing)"]
-        Razorpay["Razorpay\n(Payment Gateway)"]
-        S3["AWS S3\n(PDF Storage)"]
-    end
-
-    subgraph Storage ["Data Layer"]
-        MySQL["MySQL (RDS)\nPrimary Database"]
-        Redis["Redis\nCache & Refresh Tokens"]
-    end
-
-    UI -->|"HTTPS + JWT Bearer"| Nginx
-    WS_Client -->|"WSS /ws"| Nginx
-    Nginx --> JwtFilter
-    JwtFilter --> SecConfig
-    SecConfig --> AuthCtrl & SessionCtrl & BillCtrl & MemberCtrl & SpinCtrl
-    SecConfig --> WSBroker
-
-    BillCtrl --> GeminiAI
-    MemberCtrl --> Razorpay
-    SessionCtrl --> S3
-
-    AuthCtrl & SessionCtrl & BillCtrl & MemberCtrl & SpinCtrl --> MySQL
-    AuthCtrl --> Redis
-    WSBroker -->|"Push Events"| WS_Client
+```
+SplitTheBill/
+├── backend/                  # Spring Boot REST API + WebSocket
+│   ├── src/main/java/        # Java source (controllers, services, entities)
+│   ├── src/main/resources/   # application.properties (dev + prod)
+│   ├── Dockerfile
+│   └── pom.xml
+├── frontend/                 # React + Vite SPA
+│   ├── src/                  # Components, pages, services, context
+│   ├── public/
+│   ├── index.html
+│   ├── vite.config.js
+│   └── package.json
+├── deploy/
+│   ├── setup-server.sh       # Run ONCE on a fresh EC2 instance
+│   ├── deploy.sh             # Local → EC2 deploy script
+│   └── .env.template         # Template for /opt/splitthebill/.env on EC2
+└── .github/workflows/
+    └── deploy.yml            # CI/CD: build + auto-deploy to EC2 on push to main
 ```
 
 ---
 
-## 📊 Database Entity-Relationship (ER) Diagram
-
-```mermaid
-erDiagram
-    USERS ||--o{ SESSIONS : "hosts"
-    SESSIONS ||--|{ SESSION_MEMBERS : "has"
-    SESSIONS ||--|{ BILL_ITEMS : "contains"
-    SESSIONS ||--o{ SPINNER_RESULTS : "records"
-    SESSION_MEMBERS ||--o{ ITEM_ASSIGNMENTS : "assigned to"
-    BILL_ITEMS ||--o{ ITEM_ASSIGNMENTS : "assigned via"
-
-    USERS {
-        Long id PK
-        String name
-        String email UK
-        String password
-        LocalDateTime createdAt
-    }
-
-    SESSIONS {
-        Long id PK
-        String roomCode UK
-        String hotelName
-        String tableNumber
-        SplitType splitType "EQUAL | ITEMWISE | PERCENTAGE"
-        String currency
-        BigDecimal taxPercent
-        BigDecimal tipPercent
-        SessionStatus status "WAITING | ACTIVE | GRACE_PERIOD | COLLECTING | SETTLED"
-        Long host_id FK
-        Integer durationMinutes
-        String hostUpiId
-        String razorpayKeyId
-        String pdfUrl
-        LocalDateTime startedAt
-        LocalDateTime closedAt
-        LocalDateTime createdAt
-    }
-
-    SESSION_MEMBERS {
-        Long id PK
-        Long session_id FK
-        String name
-        String upiId
-        Boolean isPaid
-        Boolean isConfirmed
-        BigDecimal amountDue
-        String razorpayPaymentId
-    }
-
-    BILL_ITEMS {
-        Long id PK
-        Long session_id FK
-        String name
-        BigDecimal price
-        Integer quantity
-    }
-
-    ITEM_ASSIGNMENTS {
-        Long id PK
-        Long bill_item_id FK
-        Long session_member_id FK
-    }
-
-    SPINNER_RESULTS {
-        Long id PK
-        Long session_id FK
-        Long winner_member_id FK
-        String reason
-        LocalDateTime spunAt
-    }
-```
-
----
-
-## 🔄 Session Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> WAITING : Host creates session
-    WAITING --> ACTIVE : Host starts session (QR code shared to guests)
-    ACTIVE --> GRACE_PERIOD : Time limit reached
-    ACTIVE --> COLLECTING : Host closes and calculates split
-    GRACE_PERIOD --> COLLECTING : Grace window expires
-    COLLECTING --> SETTLED : All members paid and host settles
-    SETTLED --> [*]
-```
-
----
-
-## ⚡ Quick Start & Installation
+## 🚀 AWS EC2 Deployment Guide
 
 ### Prerequisites
-- **Java 21** (LTS)
-- **Node.js 18+** & npm
-- **MySQL 8+** (running locally)
-- **Redis** (running locally on port `6379`)
-- **Maven 3.9+**
+
+| What | Value |
+|---|---|
+| EC2 | Ubuntu 22.04 LTS, `t3.small` or larger |
+| Ports open | 22 (SSH), 80 (HTTP), 443 (HTTPS optional) |
+| RDS | MySQL 8.x (or MySQL on same EC2 for testing) |
+| S3 bucket | `splitthebill-pdfs` in your region |
 
 ---
 
-### 🚀 One-Click Launch (Windows)
+### Step 1 — First-time Server Setup (run once on EC2)
 
-Double-click **`run.bat`** or run from a terminal:
+SSH into your fresh EC2 instance and run:
 
-```cmd
-run.bat
-```
-
-This automatically detects Java 21 and Maven, then starts the backend and frontend in separate terminal windows.
-
-| Service | URL |
-| :--- | :--- |
-| **Frontend** | `http://localhost:5173` |
-| **Backend API** | `http://localhost:8085` |
-
----
-
-### 🔧 Manual Setup
-
-#### **1. Create the Database**
-```sql
-CREATE DATABASE hotelsplit_db;
-```
-
-#### **2. Configure Backend**
-
-Edit `backend/src/main/resources/application.properties`:
-```properties
-spring.datasource.username=root
-spring.datasource.password=YOUR_MYSQL_PASSWORD
-```
-
-#### **3. Add Gemini AI API Key (for bill scanning)**
-
-Get a free key at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey):
-```properties
-app.gemini.api-key=YOUR_GEMINI_API_KEY_HERE
-```
-
-#### **4. Start Redis**
 ```bash
-# Linux/Mac
-redis-server
+# Copy the setup script to EC2
+scp -i your-key.pem deploy/setup-server.sh ubuntu@<EC2_IP>:~
 
-# Windows (via Docker)
-docker run -d -p 6379:6379 redis:alpine
+# SSH in and run it
+ssh -i your-key.pem ubuntu@<EC2_IP>
+bash ~/setup-server.sh
 ```
 
-#### **5. Run Backend**
+This installs: **Java 21 · Nginx · Redis · Node.js 20** and configures the systemd service + Nginx reverse proxy.
+
+---
+
+### Step 2 — Configure Environment Variables on EC2
+
+```bash
+# SSH into EC2
+ssh -i your-key.pem ubuntu@<EC2_IP>
+
+# Create the env file from template
+sudo nano /opt/splitthebill/.env
+```
+
+Fill in the values from [`deploy/.env.template`](deploy/.env.template):
+
+```env
+DB_HOST=<your-rds-endpoint>.rds.amazonaws.com
+DB_USER=admin
+DB_PASSWORD=YOUR_RDS_PASSWORD
+JWT_SECRET=<generate with: openssl rand -base64 64>
+FRONTEND_URL=http://<EC2_PUBLIC_IP>
+AWS_ACCESS_KEY=...
+AWS_SECRET_KEY=...
+AWS_REGION=ap-south-1
+GEMINI_API_KEY=...
+SPRING_PROFILES_ACTIVE=prod
+```
+
+---
+
+### Step 3 — Deploy the App (from your local machine)
+
+Edit [`deploy/deploy.sh`](deploy/deploy.sh) and set your EC2 details:
+
+```bash
+EC2_USER="ubuntu"
+EC2_HOST="<your-ec2-public-ip>"
+EC2_KEY="/path/to/your-key.pem"
+```
+
+Then run:
+
+```bash
+bash deploy/deploy.sh
+```
+
+This will:
+1. Build the React frontend (`npm run build`)
+2. Build the Spring Boot JAR (`mvn clean package`)
+3. SCP the JAR to `/opt/splitthebill/app.jar` on EC2
+4. SCP the frontend `dist/` to `/var/www/splitthebill/`
+5. Restart the `splitthebill` systemd service
+
+---
+
+### Step 4 — CI/CD Auto-Deploy (GitHub Actions)
+
+On every push to `main`, the workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) will:
+- Build backend JAR and frontend dist
+- SCP both to your EC2
+- Restart the service
+
+**Add these GitHub Secrets** (`Settings → Secrets → Actions`):
+
+| Secret | Value |
+|---|---|
+| `EC2_HOST` | Your EC2 public IP |
+| `EC2_USER` | `ubuntu` |
+| `EC2_SSH_KEY` | Contents of your `.pem` key file |
+| `VITE_API_URL` | `http://<EC2_IP>/api` |
+| `VITE_GOOGLE_CLIENT_ID` | Your Google OAuth Client ID |
+
+---
+
+### Step 5 — Verify Deployment
+
+```bash
+# Check service status
+ssh -i your-key.pem ubuntu@<EC2_IP> 'sudo systemctl status splitthebill'
+
+# Tail logs
+ssh -i your-key.pem ubuntu@<EC2_IP> 'tail -f /var/log/splitthebill/app.log'
+
+# Quick health check
+curl http://<EC2_IP>/api/actuator/health
+```
+
+App should be live at: **`http://<EC2_IP>`**
+
+---
+
+## 💻 Local Development
+
+### Backend
+
 ```bash
 cd backend
-./mvnw spring-boot:run
+# Set env vars or edit application.properties for local DB
+mvn spring-boot:run
+# Runs on http://localhost:8085
 ```
-*Backend starts on `http://localhost:8085`*
 
-#### **6. Run Frontend**
+### Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
+# Runs on http://localhost:5173
 ```
-*Frontend starts on `http://localhost:5173`*
+
+> The frontend uses `VITE_API_URL` from `.env.local` in dev mode.  
+> Create `frontend/.env.local`:
+> ```env
+> VITE_API_URL=http://localhost:8085/api
+> ```
 
 ---
 
-## ☁️ Production Deployment (AWS EC2 + RDS)
+## 🔑 Required Credentials
 
-### 1. Configure environment variables on EC2
-
-Copy `deploy/.env.template` to `/opt/splitthebill/.env` on your EC2 instance:
-
-```env
-DB_HOST=your-rds-endpoint.rds.amazonaws.com
-DB_USER=admin
-DB_PASSWORD=YOUR_DB_PASSWORD
-JWT_SECRET=your-long-random-secret-min-64-chars
-FRONTEND_URL=https://your-domain.com
-AWS_ACCESS_KEY=YOUR_KEY
-AWS_SECRET_KEY=YOUR_SECRET
-SPRING_PROFILES_ACTIVE=prod
-```
-
-### 2. First-time server setup
-```bash
-bash setup-server.sh
-```
-
-### 3. Deploy with one command (from your local machine)
-```bash
-bash deploy.sh
-```
-
-This script:
-1. Builds the React frontend (`npm run build`)
-2. Packages the Spring Boot JAR (`mvn clean package`)
-3. Uploads files to EC2 via SCP
-4. Restarts the `splitthebill` systemd service
-
----
-
-## 📡 REST API Reference
-
-### 🔑 Authentication
-| Method | Endpoint | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | ❌ | Register a new host account |
-| `POST` | `/api/auth/login` | ❌ | Login and receive JWT tokens |
-| `POST` | `/api/auth/refresh` | ❌ | Refresh an expired access token |
-
-### 🪑 Sessions
-| Method | Endpoint | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/sessions` | ✅ JWT | Create a new split session |
-| `GET` | `/api/sessions/my` | ✅ JWT | List all sessions for logged-in host |
-| `GET` | `/api/sessions/{roomCode}` | ❌ | Get session details (+ optional QR) |
-| `POST` | `/api/sessions/{roomCode}/start` | ✅ Host | Open session — share QR to guests |
-| `POST` | `/api/sessions/{roomCode}/close` | ✅ Host | Close joining, begin grace period |
-| `POST` | `/api/sessions/{roomCode}/calculate` | ✅ Host | Calculate and distribute amounts |
-| `PATCH` | `/api/sessions/{roomCode}/tax-tip` | ✅ Host | Update tax & tip percentages |
-| `POST` | `/api/sessions/{roomCode}/settle` | ✅ Host | Mark session as fully settled |
-
-### 🧾 Bill Items
-| Method | Endpoint | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/sessions/{roomCode}/items` | ❌ | Add a bill item manually |
-| `GET` | `/api/sessions/{roomCode}/items` | ❌ | List all items in session |
-| `DELETE` | `/api/sessions/{roomCode}/items/{itemId}` | ✅ Host | Remove a bill item |
-| `POST` | `/api/sessions/{roomCode}/items/scan-bill` | ❌ | Scan bill image via Gemini AI |
-| `POST` | `/api/sessions/{roomCode}/items/parse-text` | ❌ | Parse raw OCR text with Gemini |
-
-### 👥 Members
-| Method | Endpoint | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/sessions/{roomCode}/join` | ❌ | Guest joins a session |
-| `GET` | `/api/sessions/{roomCode}/members` | ❌ | List all members in session |
-| `POST` | `/api/members/{memberId}/mark-paid` | ❌ | Guest marks themselves as paid (UPI) |
-| `POST` | `/api/members/{memberId}/confirm-razorpay` | ❌ | Confirm Razorpay payment |
-| `POST` | `/api/members/{memberId}/confirm` | ✅ Host | Host confirms a payment |
-| `POST` | `/api/members/{memberId}/reject` | ✅ Host | Host rejects a payment claim |
-
-### 🎰 Spinner
-| Method | Endpoint | Auth | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/sessions/{roomCode}/spin` | ✅ Host | Spin the wheel to pick a random member |
-| `GET` | `/api/sessions/{roomCode}/spin/history` | ❌ | Get previous spin results |
-
----
-
-## 🗂️ Project Structure
-
-```
-SplitTheBill/
-├── backend/                          # Spring Boot backend
-│   ├── src/main/java/com/hotelsplit/
-│   │   ├── controller/               # REST API controllers
-│   │   ├── service/                  # Business logic
-│   │   ├── entity/                   # JPA entities (Session, Member, BillItem...)
-│   │   ├── dto/                      # Request / Response DTOs
-│   │   ├── repository/               # Spring Data JPA repositories
-│   │   ├── security/                 # JWT filter & Spring Security config
-│   │   └── config/                   # WebSocket, CORS, AWS S3, Redis config
-│   ├── src/main/resources/
-│   │   ├── application.properties    # Local config
-│   │   └── application-prod.properties  # Production config
-│   ├── pom.xml
-│   └── Dockerfile
-│
-├── frontend/                         # React 19 + Vite frontend
-│   ├── src/
-│   │   ├── pages/                    # Route-level page components
-│   │   ├── components/               # Reusable UI components
-│   │   ├── context/                  # React Auth context
-│   │   ├── services/                 # Axios API service layer
-│   │   └── utils/                    # Utility helpers
-│   ├── package.json
-│   └── vite.config.js
-│
-├── deploy/
-│   └── .env.template                 # Production environment variables template
-├── deploy.sh                         # One-command EC2 deployment script
-├── run.bat                           # One-click Windows local launcher
-└── setup-server.sh                   # EC2 first-time server provisioning script
-```
-
----
-
-## 🔐 Environment Variables
-
-| Variable | Description | Required |
-| :--- | :--- | :--- |
-| `DB_HOST` | MySQL / RDS hostname | Production |
-| `DB_USER` | Database username | Production |
-| `DB_PASSWORD` | Database password | Always |
-| `JWT_SECRET` | Secret key for signing JWTs (min 64 chars) | Always |
-| `FRONTEND_URL` | Allowed CORS origin | Always |
-| `AWS_ACCESS_KEY` | AWS access key for S3 PDF uploads | For PDF export |
-| `AWS_SECRET_KEY` | AWS secret key for S3 | For PDF export |
-| `app.gemini.api-key` | Google Gemini API key for AI bill scanning | For bill scan |
+| Credential | Where to get |
+|---|---|
+| MySQL RDS | AWS RDS Console |
+| JWT Secret | `openssl rand -base64 64` |
+| AWS S3 keys | AWS IAM Console |
+| Gemini API key | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| Google OAuth | [Google Cloud Console](https://console.cloud.google.com) |
 
 ---
 
 ## 📜 License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-*Built with ❤️ — Java 21 + Spring Boot 3.4 + React 19*
+MIT License — see [LICENSE](LICENSE)

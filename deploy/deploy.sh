@@ -9,8 +9,8 @@ set -e
 
 # ─── CONFIG — Edit these values ──────────────────────────────
 EC2_USER="ubuntu"
-EC2_HOST="YOUR_EC2_PUBLIC_IP"           # ← Replace with your EC2 IP
-EC2_KEY="/c/Users/YourName/Downloads/your-key.pem"  # ← Replace with your .pem path
+EC2_HOST="3.14.80.100"
+EC2_KEY="/c/Users/Nishath A/Downloads/splitthebill-key.pem"  # ← your .pem path
 # ──────────────────────────────────────────────────────────────
 
 

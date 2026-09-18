@@ -15,12 +15,8 @@ echo "[1/9] Updating system packages..."
 sudo apt-get update -y && sudo apt-get upgrade -y
 
 # ─── Install Java 21 ──────────────────────────────────────────
-echo "[2/9] Installing Java 21..."
-sudo apt-get install -y wget apt-transport-https gnupg
-wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | sudo gpg --dearmor -o /usr/share/keyrings/adoptium.gpg
-echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
-sudo apt-get update -y
-sudo apt-get install -y temurin-21-jdk
+echo "[2/10] Installing Java 21..."
+sudo apt-get install -y openjdk-21-jdk
 java -version
 
 # ─── Install Nginx ────────────────────────────────────────────

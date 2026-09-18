@@ -31,6 +31,145 @@ SplitTheBill/
 
 ---
 
+## 🏗️ System Architecture & Workflow
+
+```mermaid
+flowchart TD
+    subgraph Client ["🌐 Client Layer (Browser)"]
+        SPA["React 18 SPA (Vite)"]
+        AuthCtx["Auth Context + Axios Interceptor"]
+        WS_Client["STOMP WebSocket Client (SockJS)"]
+    end
+
+    subgraph EC2 ["☁️ AWS EC2 — Ubuntu 22.04"]
+        subgraph Nginx ["🔀 Nginx Reverse Proxy (Port 80)"]
+            Static["Serve Static Files\n/var/www/splitthebill"]
+            ProxyAPI["Proxy /api/ → :8085"]
+            ProxyWS["Proxy /ws/ → :8085 (Upgrade)"]
+        end
+
+        subgraph SpringBoot ["⚙️ Spring Boot 3 (Java 21) — Port 8085"]
+            subgraph Security ["🔐 Security Layer"]
+                JwtFilter["JWT Auth Filter"]
+                SecConfig["Spring Security Config"]
+            end
+
+            subgraph Controllers ["📡 REST Controllers"]
+                AuthCtrl["Auth Controller\n/api/auth/**"]
+                SessionCtrl["Session Controller\n/api/sessions/**"]
+                BillCtrl["Bill Controller\n/api/bills/**"]
+                MemberCtrl["Member Controller\n/api/members/**"]
+                SpinnerCtrl["Spinner Controller\n/api/spinner/**"]
+            end
+
+            subgraph WSLayer ["🔌 WebSocket Layer"]
+                StompBroker["STOMP Message Broker"]
+                WSConfig["WebSocket Config"]
+            end
+
+            subgraph Services ["🧠 Business Logic Services"]
+                AuthSvc["Auth Service + JWT Util"]
+                SessionSvc["Session Service + Timer Scheduler"]
+                BillSvc["Bill Service + Split Calculator"]
+                MemberSvc["Member Service"]
+                SpinnerSvc["Spinner Service"]
+                QrSvc["QR Code Service"]
+                GeminiSvc["Gemini AI Service\n(Receipt OCR)"]
+            end
+
+            subgraph Repos ["🗄️ Spring Data JPA Repositories"]
+                UserRepo["User Repository"]
+                SessionRepo["Session Repository"]
+                BillRepo["Bill Item Repository"]
+                AssignRepo["Item Assignment Repository"]
+                SpinnerRepo["Spinner Result Repository"]
+            end
+        end
+
+        Redis["⚡ Redis (Port 6379)\nSession Cache + Pub/Sub"]
+    end
+
+    subgraph AWS ["☁️ AWS Cloud Services"]
+        RDS["🗃️ Amazon RDS\nMySQL 8.x — hotelsplit_db"]
+        S3["🪣 Amazon S3\nsplitthebill-pdfs\n(PDF Receipts)"]
+    end
+
+    subgraph External ["🌍 External APIs"]
+        Gemini["🤖 Google Gemini AI\n(Bill Scan & Item Extraction)"]
+        GoogleOAuth["🔑 Google OAuth 2.0"]
+    end
+
+    subgraph CICD ["🔄 CI/CD — GitHub Actions"]
+        GHA["Push to main →\nBuild JAR + dist →\nSCP to EC2 →\nRestart service"]
+    end
+
+    %% Client → Nginx
+    SPA -->|"HTTP REST /api/"| ProxyAPI
+    WS_Client -->|"WebSocket /ws/"| ProxyWS
+    Nginx --> Static
+
+    %% Nginx → Spring Boot
+    ProxyAPI --> JwtFilter
+    ProxyWS --> StompBroker
+
+    %% Security flow
+    JwtFilter --> SecConfig
+    SecConfig --> Controllers
+
+    %% Controllers → Services
+    AuthCtrl --> AuthSvc
+    SessionCtrl --> SessionSvc
+    BillCtrl --> BillSvc
+    MemberCtrl --> MemberSvc
+    SpinnerCtrl --> SpinnerSvc
+
+    %% Services → Repos
+    AuthSvc --> UserRepo
+    SessionSvc --> SessionRepo
+    BillSvc --> BillRepo
+    BillSvc --> AssignRepo
+    MemberSvc --> SessionRepo
+    SpinnerSvc --> SpinnerRepo
+
+    %% WebSocket broadcast
+    Services --> StompBroker
+    StompBroker -->|"STOMP push /topic/session/{id}"| WS_Client
+
+    %% Repos → RDS
+    UserRepo --> RDS
+    SessionRepo --> RDS
+    BillRepo --> RDS
+    AssignRepo --> RDS
+    SpinnerRepo --> RDS
+
+    %% Services → Redis
+    SessionSvc <-->|"Cache + Expiry"| Redis
+    StompBroker <-->|"Pub/Sub"| Redis
+
+    %% Services → AWS
+    BillSvc -->|"Upload PDF"| S3
+    GeminiSvc -->|"Gemini API"| Gemini
+
+    %% Auth → Google
+    AuthSvc -->|"Google Token Verify"| GoogleOAuth
+
+    %% CI/CD
+    CICD -->|"SCP JAR + dist"| EC2
+```
+
+### 🔑 Key Design Decisions
+
+| Concern | Solution |
+|---|---|
+| **Real-time updates** | WebSocket (STOMP over SockJS) — all clients in a session get instant item assignments & payment status |
+| **Session state** | Redis cache stores active session data with TTL-based expiry; MySQL is source of truth |
+| **Auth** | Stateless JWT (HS512) — access token (24h) + refresh token (7d) |
+| **Receipt scanning** | Google Gemini AI Vision parses bill photos → extracts line items automatically |
+| **Reverse proxy** | Nginx serves the React SPA and proxies `/api/` & `/ws/` to Spring Boot on port 8085 |
+| **PDF storage** | Receipts uploaded to Amazon S3 (`splitthebill-pdfs` bucket) |
+
+---
+
 ## 🚀 AWS EC2 Deployment Guide
 
 ### Prerequisites

@@ -42,36 +42,20 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 node -v && npm -v
 
-# ─── Install MySQL 8 ──────────────────────────────────────────
-echo "[6/10] Installing MySQL 8..."
-sudo apt-get install -y mysql-server
-sudo systemctl enable mysql
-sudo systemctl start mysql
-
-# Secure MySQL and create app database + user
-# NOTE: Replace 'CHANGE_ME_DB_PASSWORD' with whatever you set as DB_PASSWORD in .env
-sudo mysql -e "
-  ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'CHANGE_ME_ROOT_PASSWORD';
-  CREATE DATABASE IF NOT EXISTS hotelsplit_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-  CREATE USER IF NOT EXISTS 'splituser'@'localhost' IDENTIFIED BY 'CHANGE_ME_DB_PASSWORD';
-  GRANT ALL PRIVILEGES ON hotelsplit_db.* TO 'splituser'@'localhost';
-  FLUSH PRIVILEGES;
-"
-echo "  ✓ MySQL ready — database: hotelsplit_db, user: splituser"
-echo "  ⚠  Update DB_HOST=localhost, DB_USER=splituser, DB_PASSWORD=CHANGE_ME_DB_PASSWORD in /opt/splitthebill/.env"
-
-
-# ─── Create app user & directories ───────────────────────────
-echo "[7/10] Creating app directories..."
+# ─── Create app directories ───────────────────────────────────
+echo "[6/9] Creating app directories..."
 sudo mkdir -p /opt/splitthebill
+sudo mkdir -p /opt/splitthebill/data    # H2 database files stored here
 sudo mkdir -p /var/log/splitthebill
 sudo mkdir -p /var/www/splitthebill
 sudo chown -R ubuntu:ubuntu /opt/splitthebill
 sudo chown -R ubuntu:ubuntu /var/log/splitthebill
 sudo chown -R ubuntu:ubuntu /var/www/splitthebill
+echo "  ✓ H2 database will store data at /opt/splitthebill/data/ (no MySQL needed)"
+
 
 # ─── Configure Nginx ──────────────────────────────────────────
-echo "[8/10] Configuring Nginx..."
+echo "[7/9] Configuring Nginx..."
 sudo tee /etc/nginx/sites-available/splitthebill > /dev/null << 'NGINX_EOF'
 server {
     listen 80;
@@ -125,7 +109,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 # ─── Create systemd service for Spring Boot ───────────────────
-echo "[9/10] Creating systemd service..."
+echo "[8/9] Creating systemd service..."
 sudo tee /etc/systemd/system/splitthebill.service > /dev/null << 'SERVICE_EOF'
 [Unit]
 Description=SplitTheBill Spring Boot Application
@@ -151,7 +135,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable splitthebill
 
 # ─── Configure UFW firewall ───────────────────────────────────
-echo "[10/10] Configuring firewall..."
+echo "[9/9] Configuring firewall..."
 sudo ufw allow OpenSSH
 sudo ufw allow 'Nginx Full'
 sudo ufw --force enable

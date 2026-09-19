@@ -2,7 +2,7 @@
 
 A real-time bill-splitting web app for groups — scan receipts, assign items, and settle up instantly.
 
-**Stack:** React (Vite) · Spring Boot 3 (Java 21) · MySQL · Redis · WebSocket (STOMP) · Nginx · AWS EC2
+**Stack:** React (Vite) · Spring Boot 3 (Java 21) · H2 Database · Redis · WebSocket (STOMP) · Nginx · AWS EC2
 
 ---
 
